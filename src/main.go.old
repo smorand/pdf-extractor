@@ -1,0 +1,355 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"image/png"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/gen2brain/go-fitz"
+	"google.golang.org/genai"
+)
+
+const (
+	defaultProjectID = "btdp-dta-gbl-0002-gen-ai-01"
+	defaultRegion    = "europe-west1"
+	defaultModel     = "gemini-1.5-flash"
+)
+
+type ExtractionResult struct {
+	Markdown     string          `json:"markdown"`
+	Text         string          `json:"text"`
+	Images       []ImageAnalysis `json:"images"`
+	OutputDir    string          `json:"output_dir"`
+	MarkdownFile string          `json:"markdown_file"`
+	PDFName      string          `json:"pdf_name"`
+}
+
+type ImageAnalysis struct {
+	ImagePath   string `json:"image_path"`
+	PageNumber  int    `json:"page_number"`
+	ImageNumber int    `json:"image_number"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	Caption     string `json:"caption"`
+}
+
+var (
+	green = "\033[32m"
+	red   = "\033[31m"
+	cyan  = "\033[36m"
+	reset = "\033[0m"
+)
+
+func main() {
+	var (
+		outputDir string
+		projectID string
+		region    string
+		model     string
+		cleanup   bool
+		noAI      bool
+	)
+
+	flag.StringVar(&outputDir, "output", "", "Output directory for extracted content (default: pdf_name_extraction)")
+	flag.StringVar(&projectID, "project", defaultProjectID, "GCP project ID for Vertex AI")
+	flag.StringVar(&region, "region", defaultRegion, "GCP region for Vertex AI")
+	flag.StringVar(&model, "model", defaultModel, "Vertex AI model to use")
+	flag.BoolVar(&cleanup, "cleanup", false, "Clean up image files after processing")
+	flag.BoolVar(&noAI, "no-ai", false, "Skip AI image analysis")
+	flag.Parse()
+
+	if flag.NArg() < 1 {
+		fmt.Fprintf(os.Stderr, "%sUsage: pdf-extractor [OPTIONS] <pdf-file>%s\n", red, reset)
+		fmt.Fprintf(os.Stderr, "\nOptions:\n")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	pdfPath := flag.Arg(0)
+
+	// Validate PDF file exists
+	if _, err := os.Stat(pdfPath); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "%s❌ PDF file not found: %s%s\n", red, pdfPath, reset)
+		os.Exit(1)
+	}
+
+	fmt.Fprintf(os.Stderr, "%s📄 Extracting PDF: %s%s\n", cyan, pdfPath, reset)
+
+	result, err := extractPDFContent(pdfPath, outputDir, projectID, region, model, cleanup, noAI)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s❌ Error: %v%s\n", red, err, reset)
+		os.Exit(1)
+	}
+
+	// Print JSON result to stdout
+	jsonData, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s❌ Error marshaling result: %v%s\n", red, err, reset)
+		os.Exit(1)
+	}
+	fmt.Println(string(jsonData))
+
+	fmt.Fprintf(os.Stderr, "%s✅ Extraction complete!%s\n", green, reset)
+	fmt.Fprintf(os.Stderr, "%s   Output directory: %s%s\n", green, result.OutputDir, reset)
+	fmt.Fprintf(os.Stderr, "%s   Markdown file: %s%s\n", green, result.MarkdownFile, reset)
+}
+
+func extractPDFContent(pdfPath, outputDir, projectID, region, model string, cleanup, noAI bool) (*ExtractionResult, error) {
+	// Open PDF document
+	doc, err := fitz.New(pdfPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open PDF: %w", err)
+	}
+	defer doc.Close()
+
+	// Determine output directory
+	if outputDir == "" {
+		baseName := strings.TrimSuffix(filepath.Base(pdfPath), filepath.Ext(pdfPath))
+		outputDir = fmt.Sprintf("%s_extraction", baseName)
+	}
+
+	// Create output directory
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Create images subdirectory
+	imagesDir := filepath.Join(outputDir, "images")
+	if err := os.MkdirAll(imagesDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create images directory: %w", err)
+	}
+
+	var fullText strings.Builder
+	var images []ImageAnalysis
+	imageCounter := 0
+
+	fmt.Fprintf(os.Stderr, "%s📖 Processing %d pages...%s\n", cyan, doc.NumPage(), reset)
+
+	// Extract text and images from each page
+	for pageNum := 0; pageNum < doc.NumPage(); pageNum++ {
+		fmt.Fprintf(os.Stderr, "%s   Processing page %d/%d...%s\r", cyan, pageNum+1, doc.NumPage(), reset)
+
+		// Extract text
+		text, err := doc.Text(pageNum)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract text from page %d: %w", pageNum+1, err)
+		}
+		fullText.WriteString(text)
+		fullText.WriteString("\n\n")
+
+		// Extract images from page
+		img, err := doc.Image(pageNum)
+		if err != nil {
+			continue // Skip if no image on page
+		}
+
+		if img != nil {
+			imageCounter++
+			imageName := fmt.Sprintf("page_%d_image_%d.png", pageNum+1, imageCounter)
+			imagePath := filepath.Join(imagesDir, imageName)
+
+			// Save image
+			f, err := os.Create(imagePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create image file: %w", err)
+			}
+
+			if err := png.Encode(f, img); err != nil {
+				f.Close()
+				return nil, fmt.Errorf("failed to encode image: %w", err)
+			}
+			f.Close()
+
+			// Analyze image with AI if not disabled
+			var analysis ImageAnalysis
+			if !noAI {
+				analysis, err = analyzeImageWithAI(imagePath, pageNum+1, imageCounter, projectID, region, model)
+				if err != nil {
+					// If AI analysis fails, create basic analysis
+					analysis = ImageAnalysis{
+						ImagePath:   imagePath,
+						PageNumber:  pageNum + 1,
+						ImageNumber: imageCounter,
+						Description: "Image analysis unavailable",
+						Type:        "unknown",
+						Caption:     "",
+					}
+					fmt.Fprintf(os.Stderr, "\n%s⚠️  AI analysis failed for %s: %v%s\n", red, imageName, err, reset)
+				}
+			} else {
+				analysis = ImageAnalysis{
+					ImagePath:   imagePath,
+					PageNumber:  pageNum + 1,
+					ImageNumber: imageCounter,
+					Description: "AI analysis skipped",
+					Type:        "image",
+					Caption:     "",
+				}
+			}
+
+			images = append(images, analysis)
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+
+	// Create markdown output
+	markdown := createMarkdownOutput(fullText.String(), images, filepath.Base(pdfPath))
+
+	// Save markdown file
+	markdownFile := filepath.Join(outputDir, "extracted_content.md")
+	if err := os.WriteFile(markdownFile, []byte(markdown), 0644); err != nil {
+		return nil, fmt.Errorf("failed to write markdown file: %w", err)
+	}
+
+	// Cleanup images if requested
+	if cleanup {
+		fmt.Fprintf(os.Stderr, "%s🧹 Cleaning up image files...%s\n", cyan, reset)
+		if err := os.RemoveAll(imagesDir); err != nil {
+			fmt.Fprintf(os.Stderr, "%s⚠️  Failed to cleanup images: %v%s\n", red, err, reset)
+		}
+	}
+
+	return &ExtractionResult{
+		Markdown:     markdown,
+		Text:         fullText.String(),
+		Images:       images,
+		OutputDir:    outputDir,
+		MarkdownFile: markdownFile,
+		PDFName:      filepath.Base(pdfPath),
+	}, nil
+}
+
+func analyzeImageWithAI(imagePath string, pageNum, imageNum int, projectID, region, model string) (ImageAnalysis, error) {
+	ctx := context.Background()
+
+	// Create Vertex AI client
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		Project:  projectID,
+		Location: region,
+		Backend:  genai.BackendVertexAI,
+	})
+	if err != nil {
+		return ImageAnalysis{}, fmt.Errorf("failed to create Vertex AI client: %w", err)
+	}
+
+	// Read image file
+	imageData, err := os.ReadFile(imagePath)
+	if err != nil {
+		return ImageAnalysis{}, fmt.Errorf("failed to read image: %w", err)
+	}
+
+	// Create prompt for image analysis
+	prompt := `Analyze this image and provide:
+1. A detailed description of what the image shows
+2. The type of image (e.g., diagram, chart, photograph, illustration, screenshot, table)
+3. A suggested caption for the image
+
+Respond in JSON format:
+{
+  "description": "detailed description",
+  "type": "image type",
+  "caption": "suggested caption"
+}`
+
+	// Generate content with image
+	resp, err := client.Models.GenerateContent(ctx, model,
+		[]*genai.Content{
+			genai.NewContentFromText(prompt, genai.RoleUser),
+			genai.NewContentFromBytes(imageData, "image/png", genai.RoleUser),
+		},
+		nil, // No additional config
+	)
+	if err != nil {
+		return ImageAnalysis{}, fmt.Errorf("failed to generate content: %w", err)
+	}
+
+	// Extract response text
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+		return ImageAnalysis{}, fmt.Errorf("no response from AI model")
+	}
+
+	var responseText strings.Builder
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if part.Text != "" {
+			responseText.WriteString(part.Text)
+		}
+	}
+
+	// Try to parse JSON response
+	var aiResponse struct {
+		Description string `json:"description"`
+		Type        string `json:"type"`
+		Caption     string `json:"caption"`
+	}
+
+	// Clean response text (remove markdown code blocks if present)
+	cleanedText := responseText.String()
+	cleanedText = strings.TrimPrefix(cleanedText, "```json\n")
+	cleanedText = strings.TrimPrefix(cleanedText, "```\n")
+	cleanedText = strings.TrimSuffix(cleanedText, "\n```")
+	cleanedText = strings.TrimSpace(cleanedText)
+
+	if err := json.Unmarshal([]byte(cleanedText), &aiResponse); err != nil {
+		// If JSON parsing fails, use raw response as description
+		return ImageAnalysis{
+			ImagePath:   imagePath,
+			PageNumber:  pageNum,
+			ImageNumber: imageNum,
+			Description: cleanedText,
+			Type:        "unknown",
+			Caption:     "",
+		}, nil
+	}
+
+	return ImageAnalysis{
+		ImagePath:   imagePath,
+		PageNumber:  pageNum,
+		ImageNumber: imageNum,
+		Description: aiResponse.Description,
+		Type:        aiResponse.Type,
+		Caption:     aiResponse.Caption,
+	}, nil
+}
+
+func createMarkdownOutput(text string, images []ImageAnalysis, pdfName string) string {
+	var md strings.Builder
+
+	md.WriteString(fmt.Sprintf("# Extracted Content from %s\n\n", pdfName))
+
+	// Add text content
+	md.WriteString("## Text Content\n\n")
+	md.WriteString(text)
+	md.WriteString("\n\n")
+
+	// Add images section if any
+	if len(images) > 0 {
+		md.WriteString("## Images\n\n")
+
+		for _, img := range images {
+			md.WriteString(fmt.Sprintf("### Page %d - Image %d\n\n", img.PageNumber, img.ImageNumber))
+			md.WriteString(fmt.Sprintf("![%s](%s)\n\n", img.Caption, img.ImagePath))
+
+			if img.Type != "" && img.Type != "unknown" {
+				md.WriteString(fmt.Sprintf("**Type:** %s\n\n", img.Type))
+			}
+
+			if img.Description != "" && img.Description != "AI analysis skipped" && img.Description != "Image analysis unavailable" {
+				md.WriteString(fmt.Sprintf("**Description:** %s\n\n", img.Description))
+			}
+
+			if img.Caption != "" {
+				md.WriteString(fmt.Sprintf("**Caption:** %s\n\n", img.Caption))
+			}
+
+			md.WriteString("---\n\n")
+		}
+	}
+
+	return md.String()
+}

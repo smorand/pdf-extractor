@@ -1,0 +1,12 @@
+# Binary
+pdf-extractor
+
+# Go build artifacts
+src/go.sum
+
+# Test files
+*.pdf
+*_extraction/
+
+# OS files
+.DS_Store
