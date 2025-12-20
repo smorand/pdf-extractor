@@ -64,7 +64,7 @@ pdf-extractor <pdf-file>
     GCP region for Vertex AI (default: europe-west1)
 
 -model string
-    Vertex AI model to use (default: gemini-1.5-flash)
+    Vertex AI model to use (default: gemini-2.5-flash)
 
 -cleanup
     Clean up image files after processing
@@ -89,7 +89,7 @@ pdf-extractor -cleanup document.pdf
 pdf-extractor -output ./my-extraction document.pdf
 
 # Use different Vertex AI model
-pdf-extractor -model gemini-1.5-pro document.pdf
+pdf-extractor -model gemini-2.5-flash document.pdf
 ```
 
 ## Output
