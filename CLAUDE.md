@@ -56,7 +56,7 @@ type ImageAnalysis struct {
 ### Default Values
 - **GCP Project**: btdp-dta-gbl-0002-gen-ai-01
 - **Region**: europe-west1
-- **Model**: gemini-1.5-flash
+- **Model**: gemini-2.5-flash
 
 ### CLI Flags
 - `-output`: Output directory (default: `{pdf_name}_extraction`)
@@ -182,7 +182,7 @@ pdf-extractor -cleanup document.pdf
 pdf-extractor -output ./results document.pdf
 
 # Use different AI model
-pdf-extractor -model gemini-1.5-pro document.pdf
+pdf-extractor -model gemini-2.5-flash document.pdf
 ```
 
 ## Debugging

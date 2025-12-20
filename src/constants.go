@@ -4,7 +4,7 @@ const (
 	// Default GCP configuration
 	defaultProjectID = "btdp-dta-gbl-0002-gen-ai-01"
 	defaultRegion    = "europe-west1"
-	defaultModel     = "gemini-1.5-flash"
+	defaultModel     = "gemini-2.5-flash"
 
 	// File permissions
 	dirPermissions  = 0755
