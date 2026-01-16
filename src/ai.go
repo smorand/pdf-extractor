@@ -29,11 +29,12 @@ type aiResponse struct {
 	Caption     string `json:"caption"`
 }
 
-// analyzeImageWithAI uses Vertex AI to analyze an image
-func analyzeImageWithAI(imagePath string, pageNum, imageNum int, projectID, region, model string) (ImageAnalysis, error) {
+// analyzeImageWithAI uses Gemini AI to analyze an image
+func analyzeImageWithAI(imagePath string, pageNum, imageNum int, region, model string) (ImageAnalysis, error) {
 	ctx := context.Background()
 
-	client, err := createVertexAIClient(ctx, projectID, region)
+	cfg := getAIConfig(region)
+	client, err := createAIClient(ctx, cfg)
 	if err != nil {
 		return ImageAnalysis{}, err
 	}
@@ -51,15 +52,56 @@ func analyzeImageWithAI(imagePath string, pageNum, imageNum int, projectID, regi
 	return parseAIResponse(responseText, imagePath, pageNum, imageNum)
 }
 
-// createVertexAIClient creates a new Vertex AI client
-func createVertexAIClient(ctx context.Context, projectID, region string) (*genai.Client, error) {
+// aiConfig holds the AI backend configuration
+type aiConfig struct {
+	useVertexAI bool
+	apiKey      string
+	projectID   string
+	region      string
+}
+
+// getAIConfig reads AI configuration from environment variables
+func getAIConfig(region string) aiConfig {
+	useVertexAI := true
+	if v := os.Getenv(envUseVertexAI); v == "false" || v == "0" {
+		useVertexAI = false
+	}
+
+	return aiConfig{
+		useVertexAI: useVertexAI,
+		apiKey:      os.Getenv(envAPIKey),
+		projectID:   os.Getenv(envGCPProject),
+		region:      region,
+	}
+}
+
+// createAIClient creates a new Gemini client based on configuration
+func createAIClient(ctx context.Context, cfg aiConfig) (*genai.Client, error) {
+	if cfg.useVertexAI {
+		if cfg.projectID == "" {
+			return nil, fmt.Errorf("GEMINI_GCP_PROJECT environment variable required for Vertex AI backend")
+		}
+		client, err := genai.NewClient(ctx, &genai.ClientConfig{
+			Project:  cfg.projectID,
+			Location: cfg.region,
+			Backend:  genai.BackendVertexAI,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Vertex AI client: %w", err)
+		}
+		return client, nil
+	}
+
+	// Gemini API (generativelanguage API) backend
+	if cfg.apiKey == "" {
+		return nil, fmt.Errorf("GEMINI_API_KEY environment variable required for Gemini API backend")
+	}
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		Project:  projectID,
-		Location: region,
-		Backend:  genai.BackendVertexAI,
+		APIKey:  cfg.apiKey,
+		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Vertex AI client: %w", err)
+		return nil, fmt.Errorf("failed to create Gemini API client: %w", err)
 	}
 	return client, nil
 }

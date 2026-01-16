@@ -10,7 +10,6 @@ import (
 // CLI represents command-line interface configuration
 type CLI struct {
 	outputDir string
-	projectID string
 	region    string
 	model     string
 	cleanup   bool
@@ -23,9 +22,8 @@ func parseCLI() (*CLI, error) {
 	cli := &CLI{}
 
 	flag.StringVar(&cli.outputDir, "output", "", "Output directory for extracted content (default: pdf_name_extraction)")
-	flag.StringVar(&cli.projectID, "project", defaultProjectID, "GCP project ID for Vertex AI")
-	flag.StringVar(&cli.region, "region", defaultRegion, "GCP region for Vertex AI")
-	flag.StringVar(&cli.model, "model", defaultModel, "Vertex AI model to use")
+	flag.StringVar(&cli.region, "region", defaultRegion, "GCP region for Vertex AI (only used with Vertex AI backend)")
+	flag.StringVar(&cli.model, "model", defaultModel, "Gemini model to use")
 	flag.BoolVar(&cli.cleanup, "cleanup", false, "Clean up image files after processing")
 	flag.BoolVar(&cli.noAI, "no-ai", false, "Skip AI image analysis")
 	flag.Parse()

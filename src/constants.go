@@ -1,10 +1,14 @@
 package main
 
 const (
-	// Default GCP configuration
-	defaultProjectID = "*******-dta-gbl-0002-gen-ai-01"
-	defaultRegion    = "europe-west1"
-	defaultModel     = "gemini-2.5-flash"
+	// Default AI configuration
+	defaultRegion = "europe-west1"
+	defaultModel  = "gemini-2.5-flash"
+
+	// Environment variable names
+	envUseVertexAI = "GEMINI_USE_VERTEX_AI"
+	envAPIKey      = "GEMINI_API_KEY"
+	envGCPProject  = "GEMINI_GCP_PROJECT"
 
 	// File permissions
 	dirPermissions  = 0755

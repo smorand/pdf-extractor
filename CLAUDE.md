@@ -54,15 +54,28 @@ type ImageAnalysis struct {
 ## Configuration
 
 ### Default Values
-- **GCP Project**: *******-dta-gbl-0002-gen-ai-01
-- **Region**: europe-west1
+- **Region**: europe-west1 (for Vertex AI backend)
 - **Model**: gemini-2.5-flash
+
+### Environment Variables
+The AI backend is configured via environment variables:
+
+**For Gemini API (Google AI Studio):**
+```bash
+export GEMINI_USE_VERTEX_AI=false
+export GEMINI_API_KEY="your-api-key"
+```
+
+**For Vertex AI:**
+```bash
+export GEMINI_USE_VERTEX_AI=true  # or unset (default)
+export GEMINI_GCP_PROJECT="your-gcp-project"
+```
 
 ### CLI Flags
 - `-output`: Output directory (default: `{pdf_name}_extraction`)
-- `-project`: GCP project ID for Vertex AI
-- `-region`: GCP region for Vertex AI
-- `-model`: Vertex AI model to use
+- `-region`: GCP region for Vertex AI (only used with Vertex AI backend)
+- `-model`: Gemini model to use
 - `-cleanup`: Remove image files after processing
 - `-no-ai`: Skip AI image analysis
 
@@ -88,9 +101,15 @@ type ImageAnalysis struct {
 
 ## Authentication
 
-Requires GCP credentials for AI image analysis:
+**For Gemini API (Google AI Studio):**
+- Set `GEMINI_API_KEY` environment variable with your API key
+- Set `GEMINI_USE_VERTEX_AI=false`
+
+**For Vertex AI:**
+- Set `GEMINI_GCP_PROJECT` environment variable with your GCP project ID
+- Either leave `GEMINI_USE_VERTEX_AI` unset or set to `true`
 - Application Default Credentials: `gcloud auth application-default login`
-- Service Account: Set `GOOGLE_APPLICATION_CREDENTIALS` environment variable
+- Or Service Account: Set `GOOGLE_APPLICATION_CREDENTIALS` environment variable
 
 ## Output
 
@@ -169,10 +188,16 @@ Human-readable markdown with embedded image references
 ## Usage Examples
 
 ```bash
-# Basic extraction
+# Basic extraction with Vertex AI (default)
+export GEMINI_GCP_PROJECT="my-gcp-project"
 pdf-extractor document.pdf
 
-# Skip AI analysis (faster, no GCP required)
+# Using Gemini API instead of Vertex AI
+export GEMINI_USE_VERTEX_AI=false
+export GEMINI_API_KEY="your-api-key"
+pdf-extractor document.pdf
+
+# Skip AI analysis (faster, no credentials required)
 pdf-extractor -no-ai document.pdf
 
 # Extract and cleanup images
@@ -200,8 +225,20 @@ Current implementation logs to stderr with colored output:
 
 ## AI Integration Details
 
-### Vertex AI Configuration
+### Backend Configuration
+Supports two backends configured via environment variables:
+
+**Gemini API (generativelanguage):**
+- Backend: `genai.BackendGeminiAPI`
+- Auth: API key via `GEMINI_API_KEY`
+- Enable: `GEMINI_USE_VERTEX_AI=false`
+
+**Vertex AI:**
 - Backend: `genai.BackendVertexAI`
+- Auth: GCP credentials + project via `GEMINI_GCP_PROJECT`
+- Enable: `GEMINI_USE_VERTEX_AI=true` or unset (default)
+
+### Common Configuration
 - Multimodal input: Text prompt + PNG image
 - Response format: JSON (with fallback to raw text)
 

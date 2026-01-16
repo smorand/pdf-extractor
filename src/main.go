@@ -18,7 +18,6 @@ func main() {
 	result, err := extractPDFContent(
 		cli.pdfPath,
 		cli.outputDir,
-		cli.projectID,
 		cli.region,
 		cli.model,
 		cli.cleanup,

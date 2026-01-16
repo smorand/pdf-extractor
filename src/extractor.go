@@ -12,7 +12,7 @@ import (
 )
 
 // extractPDFContent extracts text and images from a PDF file
-func extractPDFContent(pdfPath, outputDir, projectID, region, model string, cleanup, noAI bool) (*ExtractionResult, error) {
+func extractPDFContent(pdfPath, outputDir, region, model string, cleanup, noAI bool) (*ExtractionResult, error) {
 	doc, err := openPDF(pdfPath)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func extractPDFContent(pdfPath, outputDir, projectID, region, model string, clea
 		return nil, fmt.Errorf("failed to create images directory: %w", err)
 	}
 
-	text, images, err := processPages(doc, imagesDir, projectID, region, model, noAI)
+	text, images, err := processPages(doc, imagesDir, region, model, noAI)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func prepareOutputDirectory(pdfPath, outputDir string) (string, error) {
 }
 
 // processPages extracts text and images from all pages
-func processPages(doc *fitz.Document, imagesDir, projectID, region, model string, noAI bool) (string, []ImageAnalysis, error) {
+func processPages(doc *fitz.Document, imagesDir, region, model string, noAI bool) (string, []ImageAnalysis, error) {
 	var fullText strings.Builder
 	var images []ImageAnalysis
 	imageCounter := 0
@@ -95,7 +95,7 @@ func processPages(doc *fitz.Document, imagesDir, projectID, region, model string
 		fullText.WriteString(text)
 		fullText.WriteString("\n\n")
 
-		pageImages, counter, err := extractPageImages(doc, pageNum, imageCounter, imagesDir, projectID, region, model, noAI)
+		pageImages, counter, err := extractPageImages(doc, pageNum, imageCounter, imagesDir, region, model, noAI)
 		if err != nil {
 			return "", nil, err
 		}
@@ -117,7 +117,7 @@ func extractPageText(doc *fitz.Document, pageNum int) (string, error) {
 }
 
 // extractPageImages extracts images from a single page
-func extractPageImages(doc *fitz.Document, pageNum, imageCounter int, imagesDir, projectID, region, model string, noAI bool) ([]ImageAnalysis, int, error) {
+func extractPageImages(doc *fitz.Document, pageNum, imageCounter int, imagesDir, region, model string, noAI bool) ([]ImageAnalysis, int, error) {
 	var images []ImageAnalysis
 
 	img, err := doc.Image(pageNum)
@@ -133,7 +133,7 @@ func extractPageImages(doc *fitz.Document, pageNum, imageCounter int, imagesDir,
 		return nil, imageCounter, err
 	}
 
-	analysis := processImage(imagePath, pageNum+1, imageCounter, projectID, region, model, noAI, imageName)
+	analysis := processImage(imagePath, pageNum+1, imageCounter, region, model, noAI, imageName)
 	images = append(images, analysis)
 
 	return images, imageCounter, nil
@@ -155,12 +155,12 @@ func saveImageFile(imagePath string, img image.Image) error {
 }
 
 // processImage analyzes an image with AI or creates basic analysis
-func processImage(imagePath string, pageNum, imageNum int, projectID, region, model string, noAI bool, imageName string) ImageAnalysis {
+func processImage(imagePath string, pageNum, imageNum int, region, model string, noAI bool, imageName string) ImageAnalysis {
 	if noAI {
 		return createBasicAnalysis(imagePath, pageNum, imageNum, msgAnalysisSkipped, msgTypeImage)
 	}
 
-	analysis, err := analyzeImageWithAI(imagePath, pageNum, imageNum, projectID, region, model)
+	analysis, err := analyzeImageWithAI(imagePath, pageNum, imageNum, region, model)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\n%s⚠️  AI analysis failed for %s: %v%s\n", colorRed, imageName, err, colorReset)
 		return createBasicAnalysis(imagePath, pageNum, imageNum, msgAnalysisUnavailable, msgTypeUnknown)

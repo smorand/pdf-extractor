@@ -1,15 +1,16 @@
 # PDF Extractor
 
-A Go-based PDF content extraction tool that extracts text and images from PDF files, with optional AI-powered image analysis using Google Vertex AI.
+A Go-based PDF content extraction tool that extracts text and images from PDF files, with optional AI-powered image analysis using Google Gemini.
 
 ## Features
 
 - **Text Extraction**: Extract all text content from PDF documents
 - **Image Extraction**: Save embedded images as PNG files
-- **AI Image Analysis**: Analyze images using Google Vertex AI (Gemini) to generate:
+- **AI Image Analysis**: Analyze images using Google Gemini to generate:
   - Detailed descriptions
   - Image type classification (diagram, chart, photograph, etc.)
   - Suggested captions
+- **Dual Backend Support**: Use either Vertex AI or Gemini API (Google AI Studio)
 - **Markdown Output**: Generate structured markdown files with extracted content
 - **JSON Output**: Machine-readable JSON output to stdout
 - **Cleanup Mode**: Optionally remove image files after processing
@@ -19,7 +20,7 @@ A Go-based PDF content extraction tool that extracts text and images from PDF fi
 ### Prerequisites
 
 - Go 1.24 or higher
-- GCP credentials (for AI image analysis)
+- For AI image analysis: either a Gemini API key or GCP credentials
 
 ### Build from Source
 
@@ -57,14 +58,11 @@ pdf-extractor <pdf-file>
 -output string
     Output directory for extracted content (default: pdf_name_extraction)
 
--project string
-    GCP project ID for Vertex AI (default: *******-dta-gbl-0002-gen-ai-01)
-
 -region string
-    GCP region for Vertex AI (default: europe-west1)
+    GCP region for Vertex AI (default: europe-west1, only used with Vertex AI backend)
 
 -model string
-    Vertex AI model to use (default: gemini-2.5-flash)
+    Gemini model to use (default: gemini-2.5-flash)
 
 -cleanup
     Clean up image files after processing
@@ -73,10 +71,32 @@ pdf-extractor <pdf-file>
     Skip AI image analysis
 ```
 
+### Environment Variables
+
+Configure the AI backend using environment variables:
+
+**For Gemini API (Google AI Studio):**
+```bash
+export GEMINI_USE_VERTEX_AI=false
+export GEMINI_API_KEY="your-api-key"
+```
+
+**For Vertex AI:**
+```bash
+export GEMINI_USE_VERTEX_AI=true  # or leave unset (default)
+export GEMINI_GCP_PROJECT="your-gcp-project"
+```
+
 ### Examples
 
 ```bash
-# Extract PDF with default settings
+# Extract PDF using Vertex AI (default)
+export GEMINI_GCP_PROJECT="my-project"
+pdf-extractor document.pdf
+
+# Extract PDF using Gemini API
+export GEMINI_USE_VERTEX_AI=false
+export GEMINI_API_KEY="your-api-key"
 pdf-extractor document.pdf
 
 # Extract without AI analysis
@@ -88,7 +108,7 @@ pdf-extractor -cleanup document.pdf
 # Custom output directory
 pdf-extractor -output ./my-extraction document.pdf
 
-# Use different Vertex AI model
+# Use different Gemini model
 pdf-extractor -model gemini-2.5-flash document.pdf
 ```
 
@@ -131,15 +151,28 @@ The tool outputs JSON to stdout with the following structure:
 
 ## Authentication
 
-For AI image analysis, ensure you have GCP credentials configured:
+### Using Gemini API (Google AI Studio)
+
+Set your API key:
 
 ```bash
+export GEMINI_USE_VERTEX_AI=false
+export GEMINI_API_KEY="your-api-key"
+```
+
+### Using Vertex AI
+
+Set your GCP project and authenticate:
+
+```bash
+export GEMINI_GCP_PROJECT="your-gcp-project"
 gcloud auth application-default login
 ```
 
-Or set the service account key:
+Or use a service account:
 
 ```bash
+export GEMINI_GCP_PROJECT="your-gcp-project"
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 ```
 
