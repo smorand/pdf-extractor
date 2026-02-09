@@ -1,10 +1,10 @@
 module pdf-extractor
 
-go 1.25.4
+go 1.25.6
 
 require (
 	github.com/gen2brain/go-fitz v1.24.15
-	google.golang.org/genai v1.40.0
+	google.golang.org/genai v1.43.0
 )
 
 require (

@@ -15,6 +15,21 @@ A Go-based PDF content extraction tool that extracts text and images from PDF fi
 - **JSON Output**: Machine-readable JSON output to stdout
 - **Cleanup Mode**: Optionally remove image files after processing
 
+## Project Structure
+
+```
+pdf-extractor/
+├── cmd/pdf-extractor/main.go    # CLI entry point
+├── internal/extractor/          # Core extraction logic
+│   ├── types.go                 # Data types
+│   ├── constants.go             # Configuration constants
+│   ├── extractor.go             # PDF extraction
+│   ├── ai.go                    # AI image analysis
+│   └── markdown.go              # Markdown generation
+├── go.mod / go.sum              # Go module files
+└── Makefile                     # Build system
+```
+
 ## Installation
 
 ### Prerequisites
@@ -31,7 +46,7 @@ make build
 ### Install
 
 ```bash
-# Install to /usr/local/bin
+# Install to ~/.local/bin
 make install
 
 # Install to custom location
@@ -193,7 +208,7 @@ make rebuild
 ### Run Tests
 
 ```bash
-make test
+make test-unit
 ```
 
 ### Format Code
@@ -208,7 +223,7 @@ make fmt
 make vet
 ```
 
-### Run All Checks (fmt + vet + test)
+### Run All Checks (fmt + vet + lint + test)
 
 ```bash
 make check
@@ -218,12 +233,6 @@ make check
 
 ```bash
 make clean
-```
-
-### Clean All (including go.mod and go.sum)
-
-```bash
-make clean-all
 ```
 
 ### Help

@@ -1,4 +1,4 @@
-package main
+package extractor
 
 import (
 	"fmt"
@@ -11,15 +11,15 @@ import (
 	"github.com/gen2brain/go-fitz"
 )
 
-// extractPDFContent extracts text and images from a PDF file
-func extractPDFContent(pdfPath, outputDir, region, model string, cleanup, noAI bool) (*ExtractionResult, error) {
-	doc, err := openPDF(pdfPath)
+// Run extracts text and images from a PDF file using the provided configuration
+func Run(cfg Config) (*ExtractionResult, error) {
+	doc, err := openPDF(cfg.PDFPath)
 	if err != nil {
 		return nil, err
 	}
 	defer doc.Close()
 
-	outputDir, err = prepareOutputDirectory(pdfPath, outputDir)
+	outputDir, err := prepareOutputDirectory(cfg.PDFPath, cfg.OutputDir)
 	if err != nil {
 		return nil, err
 	}
@@ -29,18 +29,18 @@ func extractPDFContent(pdfPath, outputDir, region, model string, cleanup, noAI b
 		return nil, fmt.Errorf("failed to create images directory: %w", err)
 	}
 
-	text, images, err := processPages(doc, imagesDir, region, model, noAI)
+	text, images, err := processPages(doc, imagesDir, cfg.Region, cfg.Model, cfg.NoAI)
 	if err != nil {
 		return nil, err
 	}
 
-	markdown := createMarkdownOutput(text, images, filepath.Base(pdfPath))
+	markdown := createMarkdownOutput(text, images, filepath.Base(cfg.PDFPath))
 	markdownFile, err := saveMarkdown(outputDir, markdown)
 	if err != nil {
 		return nil, err
 	}
 
-	if cleanup {
+	if cfg.Cleanup {
 		cleanupImages(imagesDir)
 	}
 
@@ -50,7 +50,7 @@ func extractPDFContent(pdfPath, outputDir, region, model string, cleanup, noAI b
 		Images:       images,
 		OutputDir:    outputDir,
 		MarkdownFile: markdownFile,
-		PDFName:      filepath.Base(pdfPath),
+		PDFName:      filepath.Base(cfg.PDFPath),
 	}, nil
 }
 

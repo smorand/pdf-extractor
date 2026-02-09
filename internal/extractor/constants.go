@@ -1,4 +1,4 @@
-package main
+package extractor
 
 const (
 	// Default AI configuration
@@ -26,3 +26,13 @@ const (
 	msgTypeUnknown         = "unknown"
 	msgTypeImage           = "image"
 )
+
+// DefaultRegion returns the default GCP region
+func DefaultRegion() string {
+	return defaultRegion
+}
+
+// DefaultModel returns the default AI model
+func DefaultModel() string {
+	return defaultModel
+}

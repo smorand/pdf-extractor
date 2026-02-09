@@ -1,4 +1,14 @@
-package main
+package extractor
+
+// Config holds the configuration for PDF extraction
+type Config struct {
+	PDFPath   string
+	OutputDir string
+	Region    string
+	Model     string
+	Cleanup   bool
+	NoAI      bool
+}
 
 // ExtractionResult contains the complete result of PDF extraction
 type ExtractionResult struct {
