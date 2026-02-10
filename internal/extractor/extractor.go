@@ -92,6 +92,7 @@ func processPages(doc *fitz.Document, imagesDir, region, model string, noAI bool
 		if err != nil {
 			return "", nil, err
 		}
+		fullText.WriteString(fmt.Sprintf("--- page %d ---\n\n", pageNum+1))
 		fullText.WriteString(text)
 		fullText.WriteString("\n\n")
 
@@ -102,6 +103,8 @@ func processPages(doc *fitz.Document, imagesDir, region, model string, noAI bool
 		images = append(images, pageImages...)
 		imageCounter = counter
 	}
+
+	fullText.WriteString("---\n")
 
 	fmt.Fprintf(os.Stderr, "\n")
 	return fullText.String(), images, nil

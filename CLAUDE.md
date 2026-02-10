@@ -40,6 +40,7 @@ make clean          # Remove build artifacts
 - **Exported API**: `Config`, `ExtractionResult`, `ImageAnalysis`, `Run()`, `DefaultRegion()`, `DefaultModel()`
 - **Error handling**: `fmt.Errorf` with `%w` wrapping
 - **Output**: JSON to stdout, progress/errors to stderr with ANSI colors
+- **Text format**: Each page starts with `--- page N ---\n\n`, document ends with `---\n`. This enables downstream consumers to split text by page.
 
 ## Configuration
 

@@ -4,7 +4,7 @@ A Go-based PDF content extraction tool that extracts text and images from PDF fi
 
 ## Features
 
-- **Text Extraction**: Extract all text content from PDF documents
+- **Text Extraction**: Extract all text content from PDF documents with page markers (`--- page N ---`) at the start of each page and a closing `---` marker at the end
 - **Image Extraction**: Save embedded images as PNG files
 - **AI Image Analysis**: Analyze images using Google Gemini to generate:
   - Detailed descriptions
@@ -147,7 +147,7 @@ The tool outputs JSON to stdout with the following structure:
 ```json
 {
   "markdown": "...",
-  "text": "...",
+  "text": "--- page 1 ---\n\nPage 1 text...\n\n--- page 2 ---\n\nPage 2 text...\n\n---\n",
   "images": [
     {
       "image_path": "...",
