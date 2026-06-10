@@ -252,4 +252,4 @@ See LICENSE file for details.
 
 ## Author
 
-Sebastien MORAND - sebastien.morand@*******
+Sebastien MORAND - seb.morand@gmail.com
